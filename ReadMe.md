@@ -8,5 +8,5 @@
 ```
 $ python3 dqn_cartpole.py
 ```
-	を入力して［return］（Windowsでは［Enter］）キーを押す。
-	※）$ はプロンプトなので入力してはいけない。
+を入力して［return］（Windowsでは［Enter］）キーを押す。
+※）$ はプロンプトなので入力してはいけない。
