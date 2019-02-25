@@ -3,8 +3,10 @@
 3. `core.py`を`/Users/me/anaconda3/lib/python3.6/site-packages/rl`フォルダへコピーする（オリジナルの名前を変更しておく）。
 4. `dqn_cartpole.py`を`ホーム`フォルダへコピーする（オリジナルの名前を変更しておく）。
 5. `cartpole_results`を`ホーム`フォルダに作成する（オリジナルがあれば，名前を変更しておく）。  
-> ※）このフォルダに学習結果のCSVファイルが格納される。
+    ※）このフォルダに学習結果のCSVファイルが格納される。
 6. 実行はターミナル（Windowsではcmd）を開き，
-		$ python3 dqn_cartpole.py
+```
+$ python3 dqn_cartpole.py
+```
 	を入力して［return］（Windowsでは［Enter］）キーを押す。
 	※）$ はプロンプトなので入力してはいけない。
