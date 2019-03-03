@@ -14,66 +14,48 @@ import random
 class CartPoleEnv(gym.Env):
     metadata = {
         'render.modes': ['human', 'rgb_array'],
-        #'video.frames_per_second' : 50
-        'video.frames_per_second' : 200 #100
+        'video.frames_per_second' : 200
     }
 
     def __init__(self):
         self.gravity = 9.8
 
-        # self.masscart = 1.0
-
-        ##### input below data  #####
-        self.total_mass = 69.6
-        self.length_GP = 1.734 * 0.56 #0.5 # actually half the pole's length
+        ##### input below parameters #####
+        self.total_mass = 65.7
+        self.length_GP = 1.723 * 0.56  # actually 56% of the pole's length
         self.length_AP = 0.06                           # Ankle hight
         self.length = self.length_GP - self.length_AP   # length to COG from Ankle
         self.masscart = self.total_mass * 0.014 * 2
         self.masspole = self.total_mass - self.masscart #0.1
         self.polemass_length = (self.masspole * self.length)
-        self.i_moment = self.masspole * self.length**2 * (1.0/3.0 + (3.0/25.0)**2)
+        delta = 2.8
+        self.i_moment = self.masspole * self.length**2 * (1.0/3.0 + delta)
 
         # Ajust belowe parameters
-        self.tau = 0.001  # 0.02 # seconds between state updates -> 0.005 -> 0.001
-        self.series = 25  # self.series * self.tau is the keeping time(sec) of the active-torque. #50
-
-        self.odr = abs(int(np.log10(self.tau)))
-        self.kappa = 0.2 * 0.7 #0.2 * 0.5  # weight of torque added to the default active torque
-        ##### up to here #####
+        self.tau = 0.001
+        self.epsilon = 0.01
 
         ##### added by me #####
-        #----- Case 3. Pssive Torque Parameters by Misgeld et al. 2017
+        #----- Pssive Torque Parameters by Misgeld et al. 2017 --------
         self.k1 = 5.63682
         self.k2 = 5.09939
-        self.T_passive0_mag = 5.6744 * 2 * (self.length / self.length_AP)  # ~171.9
+        self.beta = math.pi / 10
+        self.T_passive0_mag = 5.6744 * 2 * (self.length / self.length_AP)
+        self.T_passive0_mag = abs( 2 * (self.length / self.length_AP) * \
+                                   (-math.exp(self.k1 * self.beta) + math.exp(-self.k2 * self.beta))
+                              )  # ~172.32
         #--------------------------------------------------------------
 
         # Angle at which to fail the episode
-        #self.theta_threshold_radians = 12 * 2 * math.pi / 360
-        self.theta_threshold_radians_front = math.radians(4) #4 * math.pi / 180 #5*
-        self.theta_threshold_radians_back = math.radians(3) #2 * math.pi / 180 #3*
+        self.theta_threshold_radians_front = math.radians(5.1)
+        self.theta_threshold_radians_back = math.radians(3.2)
         self.theta_threshol_region = math.radians(1)
         self.theta_threshold_radians = self.theta_threshold_radians_front
-        self.x_threshold_front = 0.01 #0.021
-        self.x_threshold_back = 0.01 #0.014
-        self.x_threshold = self.x_threshold_front #0.03 #0.015 #2.4
+        self.x_threshold_front = 0.01
+        self.x_threshold_back = 0.01
+        self.x_threshold = self.x_threshold_front
 
         # Angle limit set to 2 * theta_threshold_radians so failing observation is still within bounds
-        """
-        high = np.array([
-            self.x_threshold * 2,
-            np.finfo(np.float32).max,
-            self.theta_threshold_radians * 2,
-            np.finfo(np.float32).max])
-
-        high = np.array([
-            self.x_threshold * 2,
-            np.finfo(np.float32).max,
-            self.theta_threshold_radians * 2,
-            np.finfo(np.float32).max,
-            np.finfo(np.float32).max,
-            np.finfo(np.float32).max])
-        """
         high_back = np.array([
             np.finfo(np.float32).max,
             self.theta_threshold_radians_back,
@@ -88,8 +70,7 @@ class CartPoleEnv(gym.Env):
             np.finfo(np.float32).max,
             np.finfo(np.float32).max,
             np.finfo(np.float32).max])
-        self.action_space = spaces.Discrete(7)   #Discrete(2) takes a value of 0 or 1.
-        #self.observation_space = spaces.Box(-high, high)
+        self.action_space = spaces.Discrete(6)   #Discrete(6) takes a value of 0, 1, 2, 3, 4 or 5.
         self.observation_space = spaces.Box(-high_back, high_front)
 
         self.seed()
@@ -107,102 +88,63 @@ class CartPoleEnv(gym.Env):
     def step(self, action):
         assert self.action_space.contains(action), "%r (%s) invalid"%(action, type(action))
         state = self.state
-        #x0, x_dot0, theta0, theta_dot0, thetaacc0, torque0 = state
-        #t0, theta0, theta_dot0, thetaacc0, cop0, torque0 = state
-        series, theta0, theta_dot0, thetaacc0, T_acctive, torque0 = state
+        ttl, theta0, theta_dot0, thetaacc0, T_active, torque0 = state
 
         costheta = math.cos(theta0)
         sintheta = math.sin(theta0)
 
-        ##### added by me #####
-        #self.torque_mag = abs(self.total_mass * np.random.normal(0, 1.17)) / 10
-        #self.add_torque_mag = self.kappa * self.T_passive0_mag * (0.5 + np.random.rand()) # * np.random.rand()    #additional active torque
-        #self.add_torque_mag = self.masspole * np.random.normal(0, 1.18) * self.length # *self.kappa
-        #self.add_torque_mag = self.masspole * np.random.normal(0, 1.18/2) * self.length # *self.kappa
-        #self.add_torque_mag = self.kappa * self.masspole * (np.random.random()-0.5) * self.length
-        #self.add_torque_mag = self.kappa * self.masspole * (np.random.random()) * self.length
-        #self.add_torque_mag = self.kappa * self.masspole * self.length #np.random.uniform(low=0.3, high=0.7)
-        add_torque_mag = self.T_passive0_mag * 0.1
+        T_base = self.T_passive0_mag
+        rho = np.random.uniform(low=-0.03, high=0.03)
 
-        ##### up to here #####
-
-        #if int( ( t/self.tau ) % self.series ) == 0:
-            #T_acctive = self.T_passive0_mag + self.add_torque_mag if action==1 else self.T_passive0_mag - self.add_torque_mag
-        base_T_passive_mag = self.T_passive0_mag * (1 + np.random.uniform(low=-0.01, high=0.01))
-        if series == 0:
-            series = 25
+        if ttl == 0:
+            ttl = np.random.randint(20, 41)
             if action == 0:
-                T_acctive = base_T_passive_mag - add_torque_mag * 1.5
+                alpha = -15
             elif action == 1:
-                T_acctive = base_T_passive_mag - add_torque_mag * 1.25
+                alpha = -9
             elif action == 2:
-                T_acctive = base_T_passive_mag - add_torque_mag
+                alpha = -3
             elif action == 3:
-                T_acctive = base_T_passive_mag
+                alpha = 3
             elif action == 4:
-                T_acctive = base_T_passive_mag + add_torque_mag
-            elif action == 5:
-                T_acctive = base_T_passive_mag + add_torque_mag * 1.25
+                alpha = 9
             else:
-                T_acctive = base_T_passive_mag + add_torque_mag * 1.5
+                alpha = 15
+            T_active = T_base * (1 + self.epsilon * alpha + rho)
+        ttl -= 1
 
-        #T_acctive = self.T_passive0_mag + self.add_torque_mag if action==1 else self.T_passive0_mag - self.add_torque_mag
+        T_passive = 2 * (self.length / self.length_AP) * \
+                    (-math.exp(self.k1 * (theta0 + self.beta)) + math.exp(-self.k2 * (theta0 + self.beta)))
+        torque = T_active + T_passive
+        thetaacc = (self.gravity * self.polemass_length * sintheta + torque) / \
+                   (self.masspole * self.length**2 + self.i_moment)
 
-        #temp = (force + self.polemass_length * theta_dot * theta_dot * sintheta) / self.total_mass
-
-        ##### added by me #####        #T_passive = 2 * (self.length / self.length_AP) * (2 * self.beta_2 * math.sinh(self.k_2 * theta))   # first coefficient is length_COG/(length_foot/2)
-        T_passive = 2 * (self.length / self.length_AP) * (-math.exp(self.k1 * (theta0 + math.pi / 10)) + math.exp(-self.k2 * (theta0 + math.pi / 10)))
-        torque = T_acctive + T_passive
-        thetaacc = (self.gravity * self.polemass_length * sintheta + torque) / (self.masspole * self.length**2 + self.i_moment)
-        ##### up to here #####
-
-        ##### added by me <- The integral accomplished by making use of the method of trapezoid sum #####
         theta_dot = theta_dot0 + self.tau * (thetaacc0 + thetaacc) / 2  ### added
         theta = theta0 + self.tau * (theta_dot0 + theta_dot) / 2
+        self.state = (ttl, theta, theta_dot, thetaacc, T_active, torque)
 
-        #cop = self.length * sintheta
-        #x_dot = x_dot0
-        #x = self.length * sintheta
-        #x_dot = self.length * theta_dot * costheta
-        ##### up to here #####
-
-        #self.state = (t, theta, theta_dot, thetaacc, cop, torque)
-        series -= 1
-        self.state = (series, theta, theta_dot, thetaacc, T_acctive, torque)
-        '''
-        done =  x < -self.x_threshold_back \
-                or x > self.x_threshold_front \
-                or theta < -self.theta_threshold_radians_back \
-                or theta > self.theta_threshold_radians_front
         '''
         done =  theta < -self.theta_threshold_radians_back \
                 or theta > self.theta_threshold_radians_front
-        done = bool(done)
+        '''
 
-        #if not done:
-            #reward = 1.0
-        ##### added by me #####
-        #if (-self.theta_threshold_radians_back/2 <= theta <= self.theta_threshold_radians_front/2) \
-            #and (-self.x_threshold_back/2 <= x <= self.x_threshold_front/2):
-        #if (-self.theta_threshold_radians_back/2.5 <= theta <= self.theta_threshold_radians_front/2.5): # add
-            #reward = 3.0 #2.0                                                                           # add
-        #if (-self.theta_threshold_radians_back/2 <= theta <= self.theta_threshold_radians_front/2):
-            #reward = 2.0
-        if (-self.theta_threshold_radians_back/3 <= theta <= self.theta_threshold_radians_front/3):
+        done =  theta < -math.radians(3.2) or theta > math.radians(5.1)
+        done = bool(done)
+        
+        if math.radians(-0.9) <= theta <= math.radians(1.3):
             reward = 3.0
-        elif (-self.theta_threshold_radians_back/2 <= theta <= self.theta_threshold_radians_front/2):
+        elif math.radians(-1.3) <= theta <= math.radians(1.9):
             reward = 2.0
-        elif (-self.theta_threshold_radians_back/1.5 <= theta <= self.theta_threshold_radians_front/1.5):
+        elif math.radians(-1.9) <= theta <= math.radians(2.5):
             reward = 1.0
         elif not done:
-            reward = 0.0 #-1.0
+            reward = -1.0
         elif done:
-            reward = -100.0 #-100.0
-        ##### up to here #####
+            reward = -100.0
         elif self.steps_beyond_done is None:
             # Pole just fell!
             self.steps_beyond_done = 0
-            reward = 1.0 #1.0
+            reward = 1.0
         else:
             if self.steps_beyond_done == 0:
                 logger.warn("You are calling 'step()' even though this environment has already returned done = True. You should always call 'reset()' once you receive 'done = True' -- any further steps are undefined behavior.")
@@ -213,18 +155,13 @@ class CartPoleEnv(gym.Env):
 
 
     def reset(self):
-        ##### added by me #####
-        theta_init = self.np_random.uniform(low=-math.radians(1), high=math.radians(1))
-        #theta_init = 0
-        #cop_init = self.length * math.sin(theta_init)
         self.state = \
         [0,
-         theta_init,
-         self.np_random.uniform(low=-math.radians(1), high=math.radians(1)),
+         0,
+         self.np_random.uniform(low=-math.radians(2), high=math.radians(2)),
          0,
          self.T_passive0_mag,
-         self.T_passive0_mag + 2 * (self.length / self.length_AP) * (-math.exp(self.k1 * (theta_init + math.pi/10)) + math.exp(-self.k2 * (theta_init + math.pi/10)))]
-        ##### up tp here #####
+         0]
 
         self.steps_beyond_done = None
         return np.array(self.state)
