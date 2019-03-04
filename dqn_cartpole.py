@@ -49,8 +49,8 @@ dqn.compile(Adam(lr=1e-3), metrics=['mae'])
 dqn.fit(env, nb_steps=150000, visualize=False, verbose=2) #verbose=2 nb_steps=50000
 
 # After training is done, we save the final weights.
-dqn.save_weights('dqn_{}_weights.h5f'.format(ENV_NAME), overwrite=True)
-#dqn.load_weights('dqn_{}_weights.h5f'.format(ENV_NAME))
+dqn.save_weights('dqn_{}_weights.h5f'.format(ENV_NAME), overwrite=True)  #You want to save the weight.
+#dqn.load_weights('dqn_{}_weights.h5f'.format(ENV_NAME))                 #You want to load the weight.
 
 # Finally, evaluate our algorithm for 5 episodes.
 dqn.test(env, nb_episodes=20, visualize=False)  #nb_episodes=20
