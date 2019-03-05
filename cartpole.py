@@ -41,9 +41,7 @@ class CartPoleEnv(gym.Env):
         self.k2 = 5.09939
         self.beta = math.pi / 10
         self.T_passive0_mag = 5.6744 * 2 * (self.length / self.length_AP)
-        self.T_passive0_mag = abs( 2 * (self.length / self.length_AP) * \
-                                   (-math.exp(self.k1 * self.beta) + math.exp(-self.k2 * self.beta))
-                              )  # ~172.32
+        self.T_passive0_mag = abs( 2 * (self.length / self.length_AP) * (-math.exp(self.k1 * self.beta) + math.exp(-self.k2 * self.beta)))  # ~172.32
         #--------------------------------------------------------------
 
         # Angle at which to fail the episode
@@ -113,24 +111,17 @@ class CartPoleEnv(gym.Env):
             T_active = T_base * (1 + self.epsilon * alpha + rho)
         ttl -= 1
 
-        T_passive = 2 * (self.length / self.length_AP) * \
-                    (-math.exp(self.k1 * (theta0 + self.beta)) + math.exp(-self.k2 * (theta0 + self.beta)))
+        T_passive = 2 * (self.length / self.length_AP) * (-math.exp(self.k1 * (theta0 + self.beta)) + math.exp(-self.k2 * (theta0 + self.beta)))
         torque = T_active + T_passive
-        thetaacc = (self.gravity * self.polemass_length * sintheta + torque) / \
-                   (self.masspole * self.length**2 + self.i_moment)
+        thetaacc = (self.gravity * self.polemass_length * sintheta + torque) / (self.masspole * self.length**2 + self.i_moment)
 
         theta_dot = theta_dot0 + self.tau * (thetaacc0 + thetaacc) / 2  ### added
         theta = theta0 + self.tau * (theta_dot0 + theta_dot) / 2
         self.state = (ttl, theta, theta_dot, thetaacc, T_active, torque)
 
-        '''
-        done =  theta < -self.theta_threshold_radians_back \
-                or theta > self.theta_threshold_radians_front
-        '''
-
         done =  theta < -math.radians(3.2) or theta > math.radians(5.1)
         done = bool(done)
-        
+
         if math.radians(-0.9) <= theta <= math.radians(1.3):
             reward = 3.0
         elif math.radians(-1.3) <= theta <= math.radians(1.9):
@@ -155,13 +146,12 @@ class CartPoleEnv(gym.Env):
 
 
     def reset(self):
-        self.state = \
-        [0,
-         0,
-         self.np_random.uniform(low=-math.radians(2), high=math.radians(2)),
-         0,
-         self.T_passive0_mag,
-         0]
+        self.state = [0,
+                      0,
+                      self.np_random.uniform(low=-math.radians(2), high=math.radians(2)),
+                      0,
+                      self.T_passive0_mag,
+                      0]
 
         self.steps_beyond_done = None
         return np.array(self.state)
