@@ -344,9 +344,9 @@ class Agent(object):
                         break
 
                 ##### added by me #####
-                obs = str(list(observation)).replace('[','').replace(']','')
-                with open(newfile, 'a') as f:
-                    f.write(obs + '\n')
+                #obs = str(list(observation)).replace('[','').replace(']','')
+                #with open(newfile, 'a') as f:
+                #    f.write(obs + '\n')
                 ##### up to here #####
 
                 if nb_max_episode_steps and episode_step >= nb_max_episode_steps - 1:
