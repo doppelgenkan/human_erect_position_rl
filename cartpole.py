@@ -41,7 +41,7 @@ class CartPoleEnv(gym.Env):
         self.k1 = 5.63682
         self.k2 = 5.09939
         self.beta = math.pi / 10
-        self.T_passive0_mag = 5.6744 * 2 * (self.length / self.length_AP)
+        #self.T_passive0_mag = 5.6744 * 2 * (self.length / self.length_AP)
         self.T_passive0_mag = abs( 2 * (self.length / self.length_AP) * (-math.exp(self.k1 * self.beta) + math.exp(-self.k2 * self.beta)))  # ~172.32
         #--------------------------------------------------------------
 
